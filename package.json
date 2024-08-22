@@ -18,7 +18,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build ."
+    "build": "vite build .",
+    "test": "echo 'no test'"
   },
   "dependencies": {
     "picogl": "^0.17.9"
