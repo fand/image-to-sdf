@@ -4,15 +4,29 @@
   "author": "AMAGI <mail@amagi.dev> (https://amagi.dev/)",
   "description": "",
   "keywords": [],
-  "main": "index.js",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/image-to-sdf.umd.cjs",
+  "module": "./dist/image-to-sdf.js",
+  "exports": {
+    ".": {
+      "import": "./dist/image-to-sdf.js",
+      "require": "./dist/image-to-sdf.umd.cjs"
+    }
+  },
   "scripts": {
-    "dev": "vite"
+    "dev": "vite",
+    "build": "vite build ."
   },
   "dependencies": {
     "picogl": "^0.17.9"
   },
   "devDependencies": {
-    "vite": "^5.4.1"
+    "@types/node": "^22.4.1",
+    "vite": "^5.4.1",
+    "vite-plugin-glsl": "^1.3.0"
   },
   "license": "MIT"
 }
