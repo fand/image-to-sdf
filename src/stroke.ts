@@ -33,11 +33,16 @@ function validateOutlineOptions(
   };
 }
 
+type OutlineRenderer = {
+  clear: () => void;
+  redraw: (opts: Partial<GetSDFOptions & DrawOutlinesOptions>) => void;
+};
+
 export async function drawOutlines(
   image: HTMLImageElement,
   sdf: Float32Array,
   opts: Partial<GetSDFOptions & DrawOutlinesOptions> = {},
-) {
+): Promise<OutlineRenderer> {
   const { spread, padding, pixelRatio, width, height, signed } =
     validateOptions(opts, image.width, image.height);
   const outlineOpts = validateOutlineOptions(opts);
@@ -112,4 +117,24 @@ export async function drawOutlines(
     // requestAnimationFrame(draw);
   }
   draw();
+
+  return {
+    clear: () => {
+      canvas.remove();
+      app.loseContext();
+    },
+    redraw: (newOpts) => {
+      outlineUniformBuffer
+        .set(0, newOpts.imageAlpha as any)
+        .set(1, newOpts.strokeWidth as any)
+        .set(2, newOpts.strokeColor as any)
+        .set(3, newOpts.shadowOffset as any)
+        .set(4, newOpts.shadowWidth as any)
+        .set(5, newOpts.shadowColor as any)
+        .update();
+
+      app.clear();
+      drawCall.draw();
+    },
+  };
 }

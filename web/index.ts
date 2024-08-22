@@ -1,4 +1,7 @@
 import { getSDF, drawOutlines, getSDFImage } from "../src";
+import { Pane } from "tweakpane";
+import { DrawOutlinesOptions } from "../src/stroke";
+import { GetSDFOptions } from "../src/getSDF";
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve) => {
@@ -52,13 +55,13 @@ function drawTextOnCanvas(
   // const canvas = drawTextOnCanvas("hey", width, height, 200) as any;
   // image = canvas;
 
-  const opts = {
+  const opts: Partial<GetSDFOptions> = {
     width,
     height,
     spread: 30,
     padding: 30,
     pixelRatio: 2,
-    // signed: true,
+    signed: false,
   };
 
   const sdfImg = await getSDFImage(image, opts);
@@ -69,7 +72,7 @@ function drawTextOnCanvas(
 
   const sdf = await getSDF(image, opts);
 
-  drawOutlines(image, sdf, {
+  const outlineParams: Partial<DrawOutlinesOptions> = {
     ...opts,
     imageAlpha: 1,
     strokeWidth: 10,
@@ -77,5 +80,31 @@ function drawTextOnCanvas(
     shadowWidth: 20,
     shadowOffset: [10, -10],
     shadowColor: [0, 0, 0, 1],
+  };
+  let outlineRenderer = await drawOutlines(image, sdf, outlineParams);
+
+  const pane = new Pane();
+
+  const f1 = pane.addFolder({
+    title: "Basic",
+  });
+  f1.addBinding(opts, "signed");
+  f1.addBinding(opts, "spread", { min: 1.0, max: 100.0 });
+  f1.addBinding(opts, "padding", { min: 1.0, max: 100.0 });
+  f1.on("change", async () => {
+    outlineRenderer.clear();
+
+    const sdf = await getSDF(image, opts);
+    outlineRenderer = await drawOutlines(image, sdf, outlineParams);
+  });
+
+  const f2 = pane.addFolder({
+    title: "Stroke / Shadow",
+  });
+  f2.addBinding(outlineParams, "imageAlpha", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineParams, "strokeWidth", { min: 0.0, max: 50.0 });
+  f2.addBinding(outlineParams, "shadowWidth", { min: 0.0, max: 100.0 });
+  f2.on("change", () => {
+    outlineRenderer.redraw(outlineParams);
   });
 })();

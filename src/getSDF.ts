@@ -87,7 +87,7 @@ async function getSDFInner(
   const canvas = document.createElement("canvas");
   canvas.width = (width + padding * 2) * pixelRatio;
   canvas.height = (height + padding * 2) * pixelRatio;
-  document.body.appendChild(canvas);
+  // document.body.appendChild(canvas);
 
   const app = PicoGL.createApp(canvas).clearColor(0.0, 0.0, 0.0, 1.0);
   const plane = createPlaneGeometry(app);
@@ -150,6 +150,7 @@ async function getSDFInner(
     newImage.src = canvas.toDataURL();
 
     canvas.remove();
+    app.loseContext();
     return newImage;
   }
 }
