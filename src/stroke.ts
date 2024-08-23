@@ -1,6 +1,6 @@
 import { PicoGL } from "picogl";
 import { createDrawCall, createPlaneGeometry } from "./utils";
-import { GetSDFOptions, validateOptions } from "./getSDF";
+import { GetSDFOptions, validateOptions } from "./SDFGenerator";
 
 import strokeFs from "./stroke.frag";
 

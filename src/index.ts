@@ -1,2 +1,2 @@
-export { SDFGenerator } from "./getSDF";
+export { SDFGenerator } from "./SDFGenerator";
 export { drawOutlines } from "./stroke";

@@ -12,8 +12,8 @@ import {
   createRenderTarget,
 } from "./utils";
 
-import sdfFs from "./getSDF.frag";
-import mergeFs from "./mergeSDF.frag";
+import sdfFs from "./SDFGeneratorMain.frag";
+import mergeFs from "./SDFGeneratorMerge.frag";
 
 export type GetSDFOptions = {
   width: number;
@@ -120,57 +120,30 @@ export class SDFGenerator {
     drawCall.uniform("padding", padding);
     drawCall.uniform("spread", spread);
 
-    let outRt;
-
-    let drawCall2: DrawCall | undefined;
     if (signed) {
       const rt1 = await drawSDF(this.#app, drawCall, texture, spread, true);
       const rt2 = await drawSDF(this.#app, drawCall, texture, spread, false);
 
       const rt3 = createRenderTarget(this.#app);
-      drawCall2 = await this.#getMergeDrawCall(width, height);
-      drawCall2.texture("tex1", rt1.colorAttachments[0]);
-      drawCall2.texture("tex2", rt2.colorAttachments[0]);
+      const mergeDrawCall = await this.#getMergeDrawCall(width, height);
+      mergeDrawCall.texture("tex1", rt1.colorAttachments[0]);
+      mergeDrawCall.texture("tex2", rt2.colorAttachments[0]);
 
       this.#app.drawFramebuffer(rt3).clear();
-      drawCall2.draw();
+      mergeDrawCall.draw();
 
-      outRt = rt3;
-    } else {
-      outRt = await drawSDF(this.#app, drawCall, texture, spread, true);
-    }
-
-    if (float) {
-      // Convert to Float32Array
-      const pixels = new Float32Array(viewportWidth * viewportHeight * 4);
-
-      this.#app.readFramebuffer(outRt);
-      this.#app.gl.readPixels(
-        0,
-        0,
-        viewportWidth,
-        viewportHeight,
-        this.#app.gl.RGBA,
-        this.#app.gl.FLOAT,
-        pixels,
-      );
-
-      return pixels;
-    } else {
-      // Draw again to the canvas
-      this.#app.defaultDrawFramebuffer().clear();
-      if (signed) {
-        drawCall2!.uniform("useUnsignedFormat", true);
-        drawCall2!.draw();
+      if (float) {
+        return this.#getFloat32Array(rt3, viewportWidth, viewportHeight);
       } else {
-        drawCall.uniform("useUnsignedFormat", true);
-        drawCall.draw();
+        return this.#getImage(mergeDrawCall);
       }
-
-      const newImage = new Image();
-      newImage.src = this.canvas.toDataURL();
-
-      return newImage;
+    } else {
+      const outRt = await drawSDF(this.#app, drawCall, texture, spread, true);
+      if (float) {
+        return this.#getFloat32Array(outRt, viewportWidth, viewportHeight);
+      } else {
+        return this.#getImage(drawCall);
+      }
     }
   }
 
@@ -217,6 +190,39 @@ export class SDFGenerator {
       );
     }
     return this.#mergeDrawCall;
+  }
+
+  /** Extract framebuffer content to Float32Array */
+  #getFloat32Array(
+    buf: Framebuffer,
+    viewportWidth: number,
+    viewportHeight: number,
+  ) {
+    const pixels = new Float32Array(viewportWidth * viewportHeight * 4);
+
+    this.#app.readFramebuffer(buf);
+    this.#app.gl.readPixels(
+      0,
+      0,
+      viewportWidth,
+      viewportHeight,
+      this.#app.gl.RGBA,
+      this.#app.gl.FLOAT,
+      pixels,
+    );
+
+    return pixels;
+  }
+
+  /** Rerender the drawcall and convert to HTMLImageElement */
+  #getImage(drawCall: DrawCall): HTMLImageElement {
+    this.#app.defaultDrawFramebuffer().clear();
+    drawCall.uniform("useUnsignedFormat", true);
+    drawCall.draw();
+
+    const newImage = new Image();
+    newImage.src = this.canvas.toDataURL();
+    return newImage;
   }
 }
 
