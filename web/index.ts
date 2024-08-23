@@ -56,14 +56,6 @@ function createOutlineParams(outlineOptsBindings: OutlineOptsUI): OutlineOpts {
     pixelRatio: 2,
     signed: false,
   };
-  const sdfGen = new SDFGenerator();
-
-  let sdf = await sdfGen.getSDF(image, sdfOpts);
-  let sdfImg = await sdfGen.getSDFImage(image, sdfOpts);
-  sdfImg.style.width = `${width}px`;
-  sdfImg.style.height = `${height}px`;
-  document.querySelector("#sdf-container")!.appendChild(sdfImg);
-
   const outlineOptsBindings = {
     imageAlpha: 1,
     outlineWidth: 10,
@@ -79,6 +71,16 @@ function createOutlineParams(outlineOptsBindings: OutlineOptsUI): OutlineOpts {
   };
   let outlineOpts = createOutlineParams(outlineOptsBindings);
 
+  const sdfGen = new SDFGenerator();
+
+  // Generate SDF
+  let sdf = await sdfGen.getSDF(image, sdfOpts);
+  let sdfImg = await sdfGen.getSDFImage(image, sdfOpts);
+  sdfImg.style.width = `${width}px`;
+  sdfImg.style.height = `${height}px`;
+  document.querySelector("#sdf-container")!.appendChild(sdfImg);
+
+  // Render outline
   const outlineRenderer = new OutlineRenderer();
   await outlineRenderer.render(image, sdf, sdfOpts, outlineOpts);
   document
