@@ -2,13 +2,13 @@ import { PicoGL } from "picogl";
 import { createDrawCall, createPlaneGeometry } from "./utils";
 import { GetSDFOptions, validateOptions } from "./SDFGenerator";
 
-import strokeFs from "./stroke.frag";
+import outlineFs from "./OutlineRenderer.frag";
 
 export type DrawOutlinesOptions = {
   imageAlpha: number;
-  strokeWidth: number;
-  strokeSoftness: number;
-  strokeColor: [number, number, number, number];
+  outlineWidth: number;
+  outlineSoftness: number;
+  outlineColor: [number, number, number, number];
   shadowOffset: [number, number];
   shadowWidth: number;
   shadowSoftness: number;
@@ -19,9 +19,9 @@ function validateOutlineOptions(
   opts: Partial<DrawOutlinesOptions>,
 ): DrawOutlinesOptions {
   const imageAlpha = opts.imageAlpha ?? 1;
-  const strokeWidth = opts.strokeWidth ?? 10;
-  const strokeSoftness = opts.strokeSoftness ?? 0.5;
-  const strokeColor = opts.strokeColor ?? [1, 0, 0, 1];
+  const outlineWidth = opts.outlineWidth ?? 10;
+  const outlineSoftness = opts.outlineSoftness ?? 0.5;
+  const outlineColor = opts.outlineColor ?? [1, 0, 0, 1];
   const shadowOffset = opts.shadowOffset ?? [10, 10];
   const shadowWidth = opts.shadowWidth ?? 30;
   const shadowSoftness = opts.shadowSoftness ?? 0.5;
@@ -29,9 +29,9 @@ function validateOutlineOptions(
 
   return {
     imageAlpha,
-    strokeWidth,
-    strokeSoftness,
-    strokeColor,
+    outlineWidth,
+    outlineSoftness,
+    outlineColor,
     shadowOffset,
     shadowWidth,
     shadowSoftness,
@@ -95,9 +95,9 @@ export async function drawOutlines(
   ]);
   outlineUniformBuffer
     .set(0, outlineOpts.imageAlpha as any)
-    .set(1, outlineOpts.strokeWidth as any)
-    .set(2, outlineOpts.strokeSoftness as any)
-    .set(3, outlineOpts.strokeColor as any)
+    .set(1, outlineOpts.outlineWidth as any)
+    .set(2, outlineOpts.outlineSoftness as any)
+    .set(3, outlineOpts.outlineColor as any)
     .set(4, outlineOpts.shadowOffset as any)
     .set(5, outlineOpts.shadowWidth as any)
     .set(6, outlineOpts.shadowSoftness as any)
@@ -108,7 +108,7 @@ export async function drawOutlines(
   const planeArray = createPlaneGeometry(app);
   const drawCall = await createDrawCall(
     app,
-    strokeFs,
+    outlineFs,
     planeArray,
     width,
     height,
@@ -139,9 +139,9 @@ export async function drawOutlines(
     redraw: (newOpts) => {
       outlineUniformBuffer
         .set(0, newOpts.imageAlpha as any)
-        .set(1, newOpts.strokeWidth as any)
-        .set(2, newOpts.strokeSoftness as any)
-        .set(3, newOpts.strokeColor as any)
+        .set(1, newOpts.outlineWidth as any)
+        .set(2, newOpts.outlineSoftness as any)
+        .set(3, newOpts.outlineColor as any)
         .set(4, newOpts.shadowOffset as any)
         .set(5, newOpts.shadowWidth as any)
         .set(6, newOpts.shadowSoftness as any)

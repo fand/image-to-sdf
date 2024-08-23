@@ -12,9 +12,9 @@ uniform bool isSigned;
 
 uniform OutlineOpts {
     float imageAlpha;
-    float strokeWidth;
-    float strokeSoftness;
-    vec4 strokeColor;
+    float outlineWidth;
+    float outlineSoftness;
+    vec4 outlineColor;
     vec2 shadowOffset;
     float shadowWidth;
     float shadowSoftness;
@@ -85,12 +85,12 @@ void main() {
 
     // Outline
     float d2 = readSDF(uv); // use linear value
-    float strokeAlpha = smoothstep(strokeWidth, strokeWidth * (1. - strokeSoftness) * 0.999, d2);
-    if (strokeWidth == 0.) {
-        strokeAlpha *= 0.;
+    float outlineAlpha = smoothstep(outlineWidth, outlineWidth * (1. - outlineSoftness) * 0.999, d2);
+    if (outlineWidth == 0.) {
+        outlineAlpha *= 0.;
     }
-    vec4 cOutline = strokeColor;
-    cOutline.a *= strokeAlpha;
+    vec4 cOutline = outlineColor;
+    cOutline.a *= outlineAlpha;
     color = blend(cOutline, color);
 
     // Original image

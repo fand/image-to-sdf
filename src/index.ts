@@ -1,2 +1,2 @@
 export { SDFGenerator } from "./SDFGenerator";
-export { drawOutlines } from "./stroke";
+export { drawOutlines } from "./OutlineRenderer";
