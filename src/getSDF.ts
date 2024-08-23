@@ -9,13 +9,20 @@ import sdfFs from "./getSDF.frag";
 import mergeFs from "./mergeSDF.frag";
 
 export type GetSDFOptions = {
-  /**
-   * Number of pixels to spread edges.
-   */
   width: number;
   height: number;
+
+  /** Number of pixels to spread edges. */
   spread: number;
+
+  /** Padding size to avoid SDF clipping at the image edges. */
   padding: number;
+
+  /**
+   * Pixel ratio to control the SDF resolution.
+   * If 1, SDF will be the same size as the input (+ padding).
+   * If 0.5, SDF will be half size.
+   */
   pixelRatio: number;
   signed: boolean;
 };
