@@ -73,10 +73,12 @@ export function validateOptions(
   };
 }
 
-class SDFGenerator {
+export class SDFGenerator {
   readonly canvas: HTMLCanvasElement;
   #app: App;
   #plane: VertexArray;
+  #drawCall: DrawCall | undefined;
+  #mergeDrawCall: DrawCall | undefined;
 
   constructor() {
     this.canvas = document.createElement("canvas");
@@ -110,31 +112,20 @@ class SDFGenerator {
     );
 
     // Setup draw call
-    const drawCall = await createDrawCall(
-      this.#app,
-      sdfFs,
-      this.#plane,
-      width,
-      height,
-    );
+    const drawCall = await this.#getSDFDrawCall(width, height);
     drawCall.texture("src", texture);
     drawCall.uniform("padding", padding);
     drawCall.uniform("spread", spread);
 
     let outRt;
+
     let drawCall2: DrawCall | undefined;
     if (signed) {
       const rt1 = await drawSDF(this.#app, drawCall, texture, spread, true);
       const rt2 = await drawSDF(this.#app, drawCall, texture, spread, false);
 
       const rt3 = createRenderTarget(this.#app);
-      drawCall2 = await createDrawCall(
-        this.#app,
-        mergeFs,
-        this.#plane,
-        width,
-        height,
-      );
+      drawCall2 = await this.#getMergeDrawCall(width, height);
       drawCall2.texture("tex1", rt1.colorAttachments[0]);
       drawCall2.texture("tex2", rt2.colorAttachments[0]);
 
@@ -148,16 +139,14 @@ class SDFGenerator {
 
     if (float) {
       // Convert to Float32Array
-      const w = (width + padding * 2) * pixelRatio;
-      const h = (height + padding * 2) * pixelRatio;
-      const pixels = new Float32Array(w * h * 4);
+      const pixels = new Float32Array(viewportWidth * viewportHeight * 4);
 
       this.#app.readFramebuffer(outRt);
       this.#app.gl.readPixels(
         0,
         0,
-        w,
-        h,
+        viewportWidth,
+        viewportHeight,
         this.#app.gl.RGBA,
         this.#app.gl.FLOAT,
         pixels,
@@ -185,21 +174,47 @@ class SDFGenerator {
     }
   }
 
+  async getSDF(
+    src: HTMLImageElement | HTMLCanvasElement,
+    opts: Partial<GetSDFOptions>,
+  ): Promise<Float32Array> {
+    return this.render(src, opts, true) as Promise<Float32Array>;
+  }
+
+  async getSDFImage(
+    src: HTMLImageElement | HTMLCanvasElement,
+    opts: Partial<GetSDFOptions>,
+  ): Promise<HTMLImageElement> {
+    return this.render(src, opts, false) as Promise<HTMLImageElement>;
+  }
+
   dispose() {}
-}
 
-export async function getSDF(
-  src: HTMLImageElement | HTMLCanvasElement,
-  opts: Partial<GetSDFOptions>,
-): Promise<Float32Array> {
-  return getSDFInner(src, opts, true) as Promise<Float32Array>;
-}
+  async #getSDFDrawCall(width: number, height: number): Promise<DrawCall> {
+    if (this.#drawCall === undefined) {
+      this.#drawCall = await createDrawCall(
+        this.#app,
+        sdfFs,
+        this.#plane,
+        width,
+        height,
+      );
+    }
+    return this.#drawCall;
+  }
 
-export async function getSDFImage(
-  src: HTMLImageElement | HTMLCanvasElement,
-  opts: Partial<GetSDFOptions>,
-): Promise<HTMLImageElement> {
-  return getSDFInner(src, opts, false) as Promise<HTMLImageElement>;
+  async #getMergeDrawCall(width: number, height: number): Promise<DrawCall> {
+    if (this.#drawCall === undefined) {
+      this.#drawCall = await createDrawCall(
+        this.#app,
+        mergeFs,
+        this.#plane,
+        width,
+        height,
+      );
+    }
+    return this.#drawCall;
+  }
 }
 
 /**

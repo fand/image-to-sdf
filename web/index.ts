@@ -1,4 +1,4 @@
-import { getSDF, drawOutlines, getSDFImage } from "../src";
+import { SDFGenerator, drawOutlines } from "../src";
 import { Pane } from "tweakpane";
 import { DrawOutlinesOptions } from "../src/stroke";
 import { hexToRgba, loadImage } from "./utils";
@@ -59,14 +59,14 @@ function createOutlineParams(
     pixelRatio: 2,
     signed: false,
   };
+  const sdfGen = new SDFGenerator();
 
-  const sdfImg = await getSDFImage(image, sdfOpts);
+  const sdfImg = await sdfGen.getSDFImage(image, sdfOpts);
   sdfImg.style.width = `${width}px`;
   sdfImg.style.height = `${height}px`;
-  sdfImg.style.marginRight = `10px`;
   document.querySelector("#sdf-container")!.appendChild(sdfImg);
 
-  const sdf = await getSDF(image, sdfOpts);
+  const sdf = await sdfGen.getSDF(image, sdfOpts);
 
   const outlineOptsBindings = {
     imageAlpha: 1,
@@ -99,7 +99,7 @@ function createOutlineParams(
   f1.on("change", async () => {
     outlineRenderer.clear();
 
-    const sdf = await getSDF(image, sdfOpts);
+    const sdf = await sdfGen.getSDF(image, sdfOpts);
     outlineRenderer = await drawOutlines(image, sdf, sdfOpts, outlineOpts);
     document
       .querySelector("#output-container")!
