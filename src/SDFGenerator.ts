@@ -16,9 +16,6 @@ import sdfFs from "./SDFGeneratorMain.frag";
 import mergeFs from "./SDFGeneratorMerge.frag";
 
 export type SDFOpts = {
-  width: number;
-  height: number;
-
   /** Number of pixels to spread edges. */
   spread: number;
 
@@ -34,14 +31,7 @@ export type SDFOpts = {
   signed: boolean;
 };
 
-export function validateOpts(
-  opts: Partial<SDFOpts>,
-  width_: number,
-  height_: number,
-): SDFOpts {
-  const width = opts.width ?? width_;
-  const height = opts.height ?? height_;
-
+export function validateOpts(opts: Partial<SDFOpts>): SDFOpts {
   const spread = opts.spread ?? 10;
   const padding = opts.padding ?? 0;
   const pixelRatio = opts.pixelRatio ?? 1;
@@ -56,16 +46,8 @@ export function validateOpts(
   if (pixelRatio < 0) {
     throw "Invalid argument: pixelRatio must be > 0";
   }
-  if (width < 1) {
-    throw "Invalid argument: width must be >= 1";
-  }
-  if (height < 1) {
-    throw "Invalid argument: width must be >= 1";
-  }
 
   return {
-    width,
-    height,
     spread,
     padding,
     pixelRatio,
@@ -94,14 +76,10 @@ export class SDFGenerator {
     opts: Partial<SDFOpts> = {},
     float: boolean,
   ): Promise<Float32Array | HTMLImageElement> {
-    const { spread, padding, pixelRatio, signed, width, height } = validateOpts(
-      opts,
-      src.width,
-      src.height,
-    );
+    const { spread, padding, pixelRatio, signed } = validateOpts(opts);
 
-    const viewportWidth = (width + padding * 2) * pixelRatio;
-    const viewportHeight = (height + padding * 2) * pixelRatio;
+    const viewportWidth = (src.width + padding * 2) * pixelRatio;
+    const viewportHeight = (src.height + padding * 2) * pixelRatio;
 
     this.canvas.width = viewportWidth;
     this.canvas.height = viewportHeight;
@@ -122,7 +100,7 @@ export class SDFGenerator {
     drawCall.texture("src", texture);
     drawCall.uniform("padding", padding);
     drawCall.uniform("spread", spread);
-    drawCall.uniform("resolution", [width, height]);
+    drawCall.uniform("resolution", [src.width, src.height]);
 
     if (signed) {
       const rt1 = await drawSDF(this.#app, drawCall, texture, spread, true);
@@ -130,7 +108,7 @@ export class SDFGenerator {
 
       const rt3 = createRenderTarget(this.#app);
       const mergeDrawCall = await this.#getMergeDrawCall();
-      mergeDrawCall.uniform("resolution", [width, height]);
+      mergeDrawCall.uniform("resolution", [src.width, src.height]);
       mergeDrawCall.texture("tex1", rt1.colorAttachments[0]);
       mergeDrawCall.texture("tex2", rt2.colorAttachments[0]);
 

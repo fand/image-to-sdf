@@ -56,18 +56,25 @@ export class OutlineRenderer {
     sdfOpts_: Partial<SDFOpts> = {},
     outlineOpts_: Partial<OutlineOpts> = {},
   ) {
-    const sdfOpts = validateOpts(sdfOpts_, image.width, image.height);
+    const sdfOpts = validateOpts(sdfOpts_);
     const outlineOpts = validateOutlineOpts(outlineOpts_);
 
     // Resize canvas
-    this.canvas.width = sdfOpts.width * sdfOpts.pixelRatio;
-    this.canvas.height = sdfOpts.height * sdfOpts.pixelRatio;
-    this.canvas.style.width = `${sdfOpts.width}px`;
-    this.canvas.style.height = `${sdfOpts.height}px`;
+    this.canvas.width = image.width * sdfOpts.pixelRatio;
+    this.canvas.height = image.height * sdfOpts.pixelRatio;
+    this.canvas.style.width = `${image.width}px`;
+    this.canvas.style.height = `${image.height}px`;
     this.#app.resize(this.canvas.width, this.canvas.height);
 
     const uniformBuffer = this.#createUniformBuffer(outlineOpts);
-    const drawCall = await this.#createDrawCall(sdfOpts, uniformBuffer);
+    const drawCall = await this.#createDrawCall();
+
+    drawCall
+      .uniformBlock("OutlineOpts", uniformBuffer)
+      .uniform("resolution", [image.width, image.height] as any)
+      .uniform("padding", sdfOpts.padding)
+      .uniform("spread", sdfOpts.spread)
+      .uniform("isSigned", sdfOpts.signed);
 
     // Textures
     const texSrc = this.#app.createTexture2D(image, {
@@ -76,8 +83,8 @@ export class OutlineRenderer {
       wrapT: PicoGL.CLAMP_TO_EDGE,
     });
 
-    const sdfW = (sdfOpts.width + sdfOpts.padding * 2) * sdfOpts.pixelRatio;
-    const sdfH = (sdfOpts.height + sdfOpts.padding * 2) * sdfOpts.pixelRatio;
+    const sdfW = (image.width + sdfOpts.padding * 2) * sdfOpts.pixelRatio;
+    const sdfH = (image.height + sdfOpts.padding * 2) * sdfOpts.pixelRatio;
     const texSdf = this.#app.createTexture2D(sdf, sdfW, sdfH, {
       // flipY: true,
       wrapS: PicoGL.CLAMP_TO_EDGE,
@@ -129,20 +136,10 @@ export class OutlineRenderer {
     return uniformBuffer;
   }
 
-  async #createDrawCall(
-    opts: SDFOpts,
-    uniformBuffer: UniformBuffer,
-  ): Promise<DrawCall> {
+  async #createDrawCall(): Promise<DrawCall> {
     const drawCall =
       this.#drawCall ??
       (await createDrawCall(this.#app, outlineFs, this.#plane));
-
-    drawCall
-      .uniformBlock("OutlineOpts", uniformBuffer)
-      .uniform("resolution", [opts.width, opts.height] as any)
-      .uniform("padding", opts.padding)
-      .uniform("spread", opts.spread)
-      .uniform("isSigned", opts.signed);
 
     this.#drawCall = drawCall;
     return drawCall;

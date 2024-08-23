@@ -36,7 +36,6 @@ function createOutlineParams(outlineOptsBindings: OutlineOptsUI): OutlineOpts {
 
 (async function () {
   const [width, height] = [500, 500];
-  // const [width, height] = [1024, 512];
 
   let image = await loadImage("./github.svg");
   // let image = await loadImage("./text1.png");
@@ -49,8 +48,6 @@ function createOutlineParams(outlineOptsBindings: OutlineOptsUI): OutlineOpts {
   // image = canvas;
 
   const sdfOpts = {
-    width,
-    height,
     spread: 100,
     padding: 100,
     pixelRatio: 2,
