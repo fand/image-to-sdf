@@ -15,7 +15,7 @@ import {
 import sdfFs from "./SDFGeneratorMain.frag";
 import mergeFs from "./SDFGeneratorMerge.frag";
 
-export type GetSDFOptions = {
+export type SDFOpts = {
   width: number;
   height: number;
 
@@ -34,11 +34,11 @@ export type GetSDFOptions = {
   signed: boolean;
 };
 
-export function validateOptions(
-  opts: Partial<GetSDFOptions>,
+export function validateOpts(
+  opts: Partial<SDFOpts>,
   width_: number,
   height_: number,
-): GetSDFOptions {
+): SDFOpts {
   const width = opts.width ?? width_;
   const height = opts.height ?? height_;
 
@@ -91,18 +91,21 @@ export class SDFGenerator {
 
   async render(
     src: HTMLImageElement | HTMLCanvasElement,
-    opts: Partial<GetSDFOptions> = {},
+    opts: Partial<SDFOpts> = {},
     float: boolean,
   ): Promise<Float32Array | HTMLImageElement> {
-    const { spread, padding, pixelRatio, signed, width, height } =
-      validateOptions(opts, src.width, src.height);
+    const { spread, padding, pixelRatio, signed, width, height } = validateOpts(
+      opts,
+      src.width,
+      src.height,
+    );
 
     const viewportWidth = (width + padding * 2) * pixelRatio;
     const viewportHeight = (height + padding * 2) * pixelRatio;
 
-    this.#app.resize(viewportWidth, viewportHeight);
-    this.canvas.width = (width + padding * 2) * pixelRatio;
-    this.canvas.height = (height + padding * 2) * pixelRatio;
+    this.canvas.width = viewportWidth;
+    this.canvas.height = viewportHeight;
+    this.#app.resize(this.canvas.width, this.canvas.height);
 
     // Setup textures
     const texture = this.#app.createTexture2D(
@@ -115,17 +118,19 @@ export class SDFGenerator {
     );
 
     // Setup draw call
-    const drawCall = await this.#getSDFDrawCall(width, height);
+    const drawCall = await this.#getSDFDrawCall();
     drawCall.texture("src", texture);
     drawCall.uniform("padding", padding);
     drawCall.uniform("spread", spread);
+    drawCall.uniform("resolution", [width, height]);
 
     if (signed) {
       const rt1 = await drawSDF(this.#app, drawCall, texture, spread, true);
       const rt2 = await drawSDF(this.#app, drawCall, texture, spread, false);
 
       const rt3 = createRenderTarget(this.#app);
-      const mergeDrawCall = await this.#getMergeDrawCall(width, height);
+      const mergeDrawCall = await this.#getMergeDrawCall();
+      mergeDrawCall.uniform("resolution", [width, height]);
       mergeDrawCall.texture("tex1", rt1.colorAttachments[0]);
       mergeDrawCall.texture("tex2", rt2.colorAttachments[0]);
 
@@ -149,14 +154,14 @@ export class SDFGenerator {
 
   async getSDF(
     src: HTMLImageElement | HTMLCanvasElement,
-    opts: Partial<GetSDFOptions>,
+    opts: Partial<SDFOpts>,
   ): Promise<Float32Array> {
     return this.render(src, opts, true) as Promise<Float32Array>;
   }
 
   async getSDFImage(
     src: HTMLImageElement | HTMLCanvasElement,
-    opts: Partial<GetSDFOptions>,
+    opts: Partial<SDFOpts>,
   ): Promise<HTMLImageElement> {
     return this.render(src, opts, false) as Promise<HTMLImageElement>;
   }
@@ -166,27 +171,19 @@ export class SDFGenerator {
     this.canvas.remove();
   }
 
-  async #getSDFDrawCall(width: number, height: number): Promise<DrawCall> {
+  async #getSDFDrawCall(): Promise<DrawCall> {
     if (this.#drawCall === undefined) {
-      this.#drawCall = await createDrawCall(
-        this.#app,
-        sdfFs,
-        this.#plane,
-        width,
-        height,
-      );
+      this.#drawCall = await createDrawCall(this.#app, sdfFs, this.#plane);
     }
     return this.#drawCall;
   }
 
-  async #getMergeDrawCall(width: number, height: number): Promise<DrawCall> {
+  async #getMergeDrawCall(): Promise<DrawCall> {
     if (this.#mergeDrawCall === undefined) {
       this.#mergeDrawCall = await createDrawCall(
         this.#app,
         mergeFs,
         this.#plane,
-        width,
-        height,
       );
     }
     return this.#mergeDrawCall;

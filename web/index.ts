@@ -1,14 +1,13 @@
-import { SDFGenerator, drawOutlines } from "../src";
+import { SDFGenerator, OutlineRenderer, OutlineOpts } from "../src";
 import { Pane } from "tweakpane";
-import { DrawOutlinesOptions } from "../src/stroke";
 import { hexToRgba, loadImage } from "./utils";
 
-type DrawOutlineBindings = {
+type OutlineOptsUI = {
   imageAlpha: number;
-  strokeWidth: number;
-  strokeSoftness: number;
-  strokeColor: string;
-  strokeAlpha: number;
+  outlineWidth: number;
+  outlineSoftness: number;
+  outlineColor: string;
+  outlineAlpha: number;
   shadowWidth: number;
   shadowSoftness: number;
   shadowOffsetX: number;
@@ -17,14 +16,12 @@ type DrawOutlineBindings = {
   shadowAlpha: number;
 };
 
-function createOutlineParams(
-  outlineOptsBindings: DrawOutlineBindings,
-): DrawOutlinesOptions {
+function createOutlineParams(outlineOptsBindings: OutlineOptsUI): OutlineOpts {
   return {
     ...outlineOptsBindings,
-    strokeColor: hexToRgba(
-      outlineOptsBindings.strokeColor,
-      outlineOptsBindings.strokeAlpha,
+    outlineColor: hexToRgba(
+      outlineOptsBindings.outlineColor,
+      outlineOptsBindings.outlineAlpha,
     ),
     shadowColor: hexToRgba(
       outlineOptsBindings.shadowColor,
@@ -61,19 +58,18 @@ function createOutlineParams(
   };
   const sdfGen = new SDFGenerator();
 
-  const sdfImg = await sdfGen.getSDFImage(image, sdfOpts);
+  let sdf = await sdfGen.getSDF(image, sdfOpts);
+  let sdfImg = await sdfGen.getSDFImage(image, sdfOpts);
   sdfImg.style.width = `${width}px`;
   sdfImg.style.height = `${height}px`;
   document.querySelector("#sdf-container")!.appendChild(sdfImg);
 
-  const sdf = await sdfGen.getSDF(image, sdfOpts);
-
   const outlineOptsBindings = {
     imageAlpha: 1,
-    strokeWidth: 10,
-    strokeSoftness: 0.2,
-    strokeColor: "#FF9900",
-    strokeAlpha: 1.0,
+    outlineWidth: 10,
+    outlineSoftness: 0.2,
+    outlineColor: "#FF9900",
+    outlineAlpha: 1.0,
     shadowWidth: 20,
     shadowSoftness: 0.5,
     shadowOffsetX: 10,
@@ -81,9 +77,10 @@ function createOutlineParams(
     shadowColor: "#000000",
     shadowAlpha: 1.0,
   };
+  let outlineOpts = createOutlineParams(outlineOptsBindings);
 
-  const outlineOpts = createOutlineParams(outlineOptsBindings);
-  let outlineRenderer = await drawOutlines(image, sdf, sdfOpts, outlineOpts);
+  const outlineRenderer = new OutlineRenderer();
+  await outlineRenderer.render(image, sdf, sdfOpts, outlineOpts);
   document
     .querySelector("#output-container")!
     .appendChild(outlineRenderer.canvas);
@@ -97,33 +94,37 @@ function createOutlineParams(
   f1.addBinding(sdfOpts, "spread", { min: 1.0, max: 300.0 });
   f1.addBinding(sdfOpts, "padding", { min: 1.0, max: 300.0 });
   f1.on("change", async () => {
-    const sdf = await sdfGen.getSDF(image, sdfOpts);
+    sdfImg.remove();
 
-    outlineRenderer.clear();
-    outlineRenderer = await drawOutlines(image, sdf, sdfOpts, outlineOpts);
+    const newSdf = await sdfGen.getSDF(image, sdfOpts);
+    await outlineRenderer.render(image, newSdf, sdfOpts, outlineOpts);
 
-    document
-      .querySelector("#output-container")!
-      .appendChild(outlineRenderer.canvas);
+    const newSdfImg = await sdfGen.getSDFImage(image, sdfOpts);
+    newSdfImg.style.width = `${width}px`;
+    newSdfImg.style.height = `${height}px`;
+
+    sdf = newSdf;
+    sdfImg = newSdfImg;
+
+    const sdfContainer = document.querySelector("#sdf-container")!;
+    sdfContainer.innerHTML = "";
+    sdfContainer.appendChild(sdfImg);
   });
 
   const f2 = pane.addFolder({
-    title: "Stroke / Shadow",
+    title: "Outline / Shadow",
   });
   f2.addBinding(outlineOptsBindings, "imageAlpha", { min: 0.0, max: 1.0 });
-  f2.addBinding(outlineOptsBindings, "strokeWidth", { min: 0.0, max: 50.0 });
-  f2.addBinding(outlineOptsBindings, "strokeSoftness", { min: 0.0, max: 1.0 });
-  f2.addBinding(outlineOptsBindings, "strokeColor");
-  f2.addBinding(outlineOptsBindings, "strokeAlpha", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineOptsBindings, "outlineWidth", { min: 0.0, max: 50.0 });
+  f2.addBinding(outlineOptsBindings, "outlineSoftness", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineOptsBindings, "outlineColor");
+  f2.addBinding(outlineOptsBindings, "outlineAlpha", { min: 0.0, max: 1.0 });
   f2.addBinding(outlineOptsBindings, "shadowWidth", { min: 0.0, max: 100.0 });
   f2.addBinding(outlineOptsBindings, "shadowSoftness", { min: 0.0, max: 1.0 });
   f2.addBinding(outlineOptsBindings, "shadowColor");
   f2.addBinding(outlineOptsBindings, "shadowAlpha", { min: 0.0, max: 1.0 });
-  f2.on("change", () => {
-    const outlineParams = createOutlineParams(outlineOptsBindings);
-    outlineRenderer.redraw(outlineParams);
-    document
-      .querySelector("#output-container")!
-      .appendChild(outlineRenderer.canvas);
+  f2.on("change", async () => {
+    outlineOpts = createOutlineParams(outlineOptsBindings);
+    await outlineRenderer.render(image, sdf, sdfOpts, outlineOpts);
   });
 })();
