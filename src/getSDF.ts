@@ -73,6 +73,9 @@ export function validateOptions(
   };
 }
 
+/**
+ * Generate an SDF for the given image using jump flooding algorithm.
+ */
 export class SDFGenerator {
   readonly canvas: HTMLCanvasElement;
   #app: App;
@@ -152,7 +155,6 @@ export class SDFGenerator {
         pixels,
       );
 
-      this.canvas.remove();
       return pixels;
     } else {
       // Draw again to the canvas
@@ -168,8 +170,6 @@ export class SDFGenerator {
       const newImage = new Image();
       newImage.src = this.canvas.toDataURL();
 
-      this.canvas.remove();
-      this.#app.loseContext();
       return newImage;
     }
   }
@@ -188,7 +188,10 @@ export class SDFGenerator {
     return this.render(src, opts, false) as Promise<HTMLImageElement>;
   }
 
-  dispose() {}
+  dispose() {
+    this.#app.loseContext();
+    this.canvas.remove();
+  }
 
   async #getSDFDrawCall(width: number, height: number): Promise<DrawCall> {
     if (this.#drawCall === undefined) {
@@ -204,8 +207,8 @@ export class SDFGenerator {
   }
 
   async #getMergeDrawCall(width: number, height: number): Promise<DrawCall> {
-    if (this.#drawCall === undefined) {
-      this.#drawCall = await createDrawCall(
+    if (this.#mergeDrawCall === undefined) {
+      this.#mergeDrawCall = await createDrawCall(
         this.#app,
         mergeFs,
         this.#plane,
@@ -213,20 +216,8 @@ export class SDFGenerator {
         height,
       );
     }
-    return this.#drawCall;
+    return this.#mergeDrawCall;
   }
-}
-
-/**
- * Generate an SDF for the given image using jump flooding algorithm.
- */
-async function getSDFInner(
-  src: HTMLImageElement | HTMLCanvasElement,
-  opts: Partial<GetSDFOptions> = {},
-  float: boolean,
-): Promise<Float32Array | HTMLImageElement> {
-  const g = new SDFGenerator();
-  return g.render(src, opts, float);
 }
 
 function drawSDF(

@@ -97,10 +97,11 @@ function createOutlineParams(
   f1.addBinding(sdfOpts, "spread", { min: 1.0, max: 300.0 });
   f1.addBinding(sdfOpts, "padding", { min: 1.0, max: 300.0 });
   f1.on("change", async () => {
-    outlineRenderer.clear();
-
     const sdf = await sdfGen.getSDF(image, sdfOpts);
+
+    outlineRenderer.clear();
     outlineRenderer = await drawOutlines(image, sdf, sdfOpts, outlineOpts);
+
     document
       .querySelector("#output-container")!
       .appendChild(outlineRenderer.canvas);
