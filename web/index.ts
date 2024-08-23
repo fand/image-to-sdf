@@ -41,6 +41,53 @@ function drawTextOnCanvas(
   return canvas;
 }
 
+type DrawOutlineBindings = {
+  imageAlpha: number;
+  strokeWidth: number;
+  strokeSoftness: number;
+  strokeColor: string;
+  strokeAlpha: number;
+  shadowWidth: number;
+  shadowSoftness: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
+  shadowColor: string;
+  shadowAlpha: number;
+};
+
+function createOutlineParams(
+  outlineOptsBindings: DrawOutlineBindings,
+): DrawOutlinesOptions {
+  return {
+    ...outlineOptsBindings,
+    strokeColor: hexToRgba(
+      outlineOptsBindings.strokeColor,
+      outlineOptsBindings.strokeAlpha,
+    ),
+    shadowColor: hexToRgba(
+      outlineOptsBindings.shadowColor,
+      outlineOptsBindings.shadowAlpha,
+    ),
+    shadowOffset: [
+      outlineOptsBindings.shadowOffsetX,
+      outlineOptsBindings.shadowOffsetY,
+    ],
+  };
+}
+
+function hexToRgba(
+  hex: string,
+  alpha: number,
+): [number, number, number, number] {
+  if (hex.length != 7) {
+    throw "hex string must have 7 characters";
+  }
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  return [r, g, b, alpha];
+}
+
 (async function () {
   const [width, height] = [500, 500];
   // const [width, height] = [1024, 512];
@@ -58,8 +105,8 @@ function drawTextOnCanvas(
   const opts: Partial<GetSDFOptions> = {
     width,
     height,
-    spread: 30,
-    padding: 30,
+    spread: 100,
+    padding: 100,
     pixelRatio: 2,
     signed: false,
   };
@@ -72,16 +119,22 @@ function drawTextOnCanvas(
 
   const sdf = await getSDF(image, opts);
 
-  const outlineParams: Partial<DrawOutlinesOptions> = {
-    ...opts,
+  const outlineParamsBinding = {
     imageAlpha: 1,
     strokeWidth: 10,
-    strokeColor: [1, 0.5, 0, 1],
+    strokeSoftness: 0.2,
+    strokeColor: "#FF9900",
+    strokeAlpha: 1.0,
     shadowWidth: 20,
-    shadowOffset: [10, -10],
-    shadowColor: [0, 0, 0, 1],
+    shadowSoftness: 0.5,
+    shadowOffsetX: 10,
+    shadowOffsetY: -10,
+    shadowColor: "#000000",
+    shadowAlpha: 1.0,
   };
-  let outlineRenderer = await drawOutlines(image, sdf, outlineParams);
+
+  const outlineParams = createOutlineParams(outlineParamsBinding);
+  let outlineRenderer = await drawOutlines(image, sdf, opts, outlineParams);
 
   const pane = new Pane();
 
@@ -89,22 +142,29 @@ function drawTextOnCanvas(
     title: "Basic",
   });
   f1.addBinding(opts, "signed");
-  f1.addBinding(opts, "spread", { min: 1.0, max: 100.0 });
-  f1.addBinding(opts, "padding", { min: 1.0, max: 100.0 });
+  f1.addBinding(opts, "spread", { min: 1.0, max: 300.0 });
+  f1.addBinding(opts, "padding", { min: 1.0, max: 300.0 });
   f1.on("change", async () => {
     outlineRenderer.clear();
 
     const sdf = await getSDF(image, opts);
-    outlineRenderer = await drawOutlines(image, sdf, outlineParams);
+    outlineRenderer = await drawOutlines(image, sdf, opts, outlineParams);
   });
 
   const f2 = pane.addFolder({
     title: "Stroke / Shadow",
   });
-  f2.addBinding(outlineParams, "imageAlpha", { min: 0.0, max: 1.0 });
-  f2.addBinding(outlineParams, "strokeWidth", { min: 0.0, max: 50.0 });
-  f2.addBinding(outlineParams, "shadowWidth", { min: 0.0, max: 100.0 });
+  f2.addBinding(outlineParamsBinding, "imageAlpha", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineParamsBinding, "strokeWidth", { min: 0.0, max: 50.0 });
+  f2.addBinding(outlineParamsBinding, "strokeSoftness", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineParamsBinding, "strokeColor");
+  f2.addBinding(outlineParamsBinding, "strokeAlpha", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineParamsBinding, "shadowWidth", { min: 0.0, max: 100.0 });
+  f2.addBinding(outlineParamsBinding, "shadowSoftness", { min: 0.0, max: 1.0 });
+  f2.addBinding(outlineParamsBinding, "shadowColor");
+  f2.addBinding(outlineParamsBinding, "shadowAlpha", { min: 0.0, max: 1.0 });
   f2.on("change", () => {
+    const outlineParams = createOutlineParams(outlineParamsBinding);
     outlineRenderer.redraw(outlineParams);
   });
 })();
