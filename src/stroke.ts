@@ -40,6 +40,7 @@ function validateOutlineOptions(
 }
 
 type OutlineRenderer = {
+  canvas: HTMLCanvasElement;
   clear: () => void;
   redraw: (opts: Partial<GetSDFOptions & DrawOutlinesOptions>) => void;
 };
@@ -60,7 +61,7 @@ export async function drawOutlines(
   canvas.height = height * pixelRatio;
   canvas.style.width = `${width}px`;
   canvas.style.height = `${height}px`;
-  document.body.appendChild(canvas);
+  // document.body.appendChild(canvas);
 
   // Setup App
   const app = PicoGL.createApp(canvas).clearColor(0.0, 0.0, 0.0, 1.0);
@@ -130,6 +131,7 @@ export async function drawOutlines(
   draw();
 
   return {
+    canvas,
     clear: () => {
       canvas.remove();
       app.loseContext();
