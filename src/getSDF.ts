@@ -1,4 +1,11 @@
-import { PicoGL, App, DrawCall, Framebuffer, Texture } from "picogl";
+import {
+  PicoGL,
+  App,
+  DrawCall,
+  Framebuffer,
+  Texture,
+  VertexArray,
+} from "picogl";
 import {
   createDrawCall,
   createPlaneGeometry,
@@ -66,6 +73,121 @@ export function validateOptions(
   };
 }
 
+class SDFGenerator {
+  readonly canvas: HTMLCanvasElement;
+  #app: App;
+  #plane: VertexArray;
+
+  constructor() {
+    this.canvas = document.createElement("canvas");
+    this.#app = PicoGL.createApp(this.canvas).clearColor(0.0, 0.0, 0.0, 1.0);
+    this.#plane = createPlaneGeometry(this.#app);
+  }
+
+  async render(
+    src: HTMLImageElement | HTMLCanvasElement,
+    opts: Partial<GetSDFOptions> = {},
+    float: boolean,
+  ): Promise<Float32Array | HTMLImageElement> {
+    const { spread, padding, pixelRatio, signed, width, height } =
+      validateOptions(opts, src.width, src.height);
+
+    const viewportWidth = (width + padding * 2) * pixelRatio;
+    const viewportHeight = (height + padding * 2) * pixelRatio;
+
+    this.#app.resize(viewportWidth, viewportHeight);
+    this.canvas.width = (width + padding * 2) * pixelRatio;
+    this.canvas.height = (height + padding * 2) * pixelRatio;
+
+    // Setup textures
+    const texture = this.#app.createTexture2D(
+      src as HTMLImageElement /** FIXME! */,
+      {
+        flipY: true,
+        wrapS: PicoGL.CLAMP_TO_EDGE,
+        wrapT: PicoGL.CLAMP_TO_EDGE,
+      },
+    );
+
+    // Setup draw call
+    const drawCall = await createDrawCall(
+      this.#app,
+      sdfFs,
+      this.#plane,
+      width,
+      height,
+    );
+    drawCall.texture("src", texture);
+    drawCall.uniform("padding", padding);
+    drawCall.uniform("spread", spread);
+
+    let outRt;
+    let drawCall2: DrawCall | undefined;
+    if (signed) {
+      const rt1 = await drawSDF(this.#app, drawCall, texture, spread, true);
+      const rt2 = await drawSDF(this.#app, drawCall, texture, spread, false);
+
+      const rt3 = createRenderTarget(this.#app);
+      drawCall2 = await createDrawCall(
+        this.#app,
+        mergeFs,
+        this.#plane,
+        width,
+        height,
+      );
+      drawCall2.texture("tex1", rt1.colorAttachments[0]);
+      drawCall2.texture("tex2", rt2.colorAttachments[0]);
+
+      this.#app.drawFramebuffer(rt3).clear();
+      drawCall2.draw();
+
+      outRt = rt3;
+    } else {
+      outRt = await drawSDF(this.#app, drawCall, texture, spread, true);
+    }
+
+    if (float) {
+      // Convert to Float32Array
+      const w = (width + padding * 2) * pixelRatio;
+      const h = (height + padding * 2) * pixelRatio;
+      const pixels = new Float32Array(w * h * 4);
+
+      this.#app.readFramebuffer(outRt);
+      this.#app.gl.readPixels(
+        0,
+        0,
+        w,
+        h,
+        this.#app.gl.RGBA,
+        this.#app.gl.FLOAT,
+        pixels,
+      );
+
+      this.canvas.remove();
+      return pixels;
+    } else {
+      // Draw again to the canvas
+      this.#app.defaultDrawFramebuffer().clear();
+      if (signed) {
+        drawCall2!.uniform("useUnsignedFormat", true);
+        drawCall2!.draw();
+      } else {
+        drawCall.uniform("useUnsignedFormat", true);
+        drawCall.draw();
+      }
+
+      const newImage = new Image();
+      newImage.src = this.canvas.toDataURL();
+
+      this.canvas.remove();
+      this.#app.loseContext();
+      return newImage;
+    }
+  }
+
+  dispose() {}
+}
+
 export async function getSDF(
   src: HTMLImageElement | HTMLCanvasElement,
   opts: Partial<GetSDFOptions>,
@@ -88,78 +210,8 @@ async function getSDFInner(
   opts: Partial<GetSDFOptions> = {},
   float: boolean,
 ): Promise<Float32Array | HTMLImageElement> {
-  const { spread, padding, pixelRatio, signed, width, height } =
-    validateOptions(opts, src.width, src.height);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = (width + padding * 2) * pixelRatio;
-  canvas.height = (height + padding * 2) * pixelRatio;
-  // document.body.appendChild(canvas);
-
-  const app = PicoGL.createApp(canvas).clearColor(0.0, 0.0, 0.0, 1.0);
-  const plane = createPlaneGeometry(app);
-
-  // Setup textures
-  const texture = app.createTexture2D(src as HTMLImageElement /** FIXME! */, {
-    flipY: true,
-    wrapS: PicoGL.CLAMP_TO_EDGE,
-    wrapT: PicoGL.CLAMP_TO_EDGE,
-  });
-
-  // Setup draw call
-  const drawCall = await createDrawCall(app, sdfFs, plane, width, height);
-  drawCall.texture("src", texture);
-  drawCall.uniform("padding", padding);
-  drawCall.uniform("spread", spread);
-
-  let outRt;
-  let drawCall2: DrawCall | undefined;
-  if (signed) {
-    const rt1 = await drawSDF(app, drawCall, texture, spread, true);
-    const rt2 = await drawSDF(app, drawCall, texture, spread, false);
-
-    const rt3 = createRenderTarget(app);
-    drawCall2 = await createDrawCall(app, mergeFs, plane, width, height);
-    drawCall2.texture("tex1", rt1.colorAttachments[0]);
-    drawCall2.texture("tex2", rt2.colorAttachments[0]);
-
-    app.drawFramebuffer(rt3).clear();
-    drawCall2.draw();
-
-    outRt = rt3;
-  } else {
-    outRt = await drawSDF(app, drawCall, texture, spread, true);
-  }
-
-  if (float) {
-    // Convert to Float32Array
-    const w = (width + padding * 2) * pixelRatio;
-    const h = (height + padding * 2) * pixelRatio;
-    const pixels = new Float32Array(w * h * 4);
-
-    app.readFramebuffer(outRt);
-    app.gl.readPixels(0, 0, w, h, app.gl.RGBA, app.gl.FLOAT, pixels);
-
-    canvas.remove();
-    return pixels;
-  } else {
-    // Draw again to the canvas
-    app.defaultDrawFramebuffer().clear();
-    if (signed) {
-      drawCall2!.uniform("useUnsignedFormat", true);
-      drawCall2!.draw();
-    } else {
-      drawCall.uniform("useUnsignedFormat", true);
-      drawCall.draw();
-    }
-
-    const newImage = new Image();
-    newImage.src = canvas.toDataURL();
-
-    canvas.remove();
-    app.loseContext();
-    return newImage;
-  }
+  const g = new SDFGenerator();
+  return g.render(src, opts, float);
 }
 
 function drawSDF(
