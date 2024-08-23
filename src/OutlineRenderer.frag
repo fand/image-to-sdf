@@ -12,10 +12,12 @@ uniform bool isSigned;
 
 uniform OutlineOpts {
     float imageAlpha;
-    float strokeWidth;
-    vec4 strokeColor;
+    float outlineWidth;
+    float outlineSoftness;
+    vec4 outlineColor;
     vec2 shadowOffset;
     float shadowWidth;
+    float shadowSoftness;
     vec4 shadowColor;
 };
 
@@ -66,12 +68,15 @@ void main() {
     // Drop shadow
     float d1 = readSDF(vUV.st - shadowOffset / resolution);
     float shadowAlpha =
-        smoothstep(shadowWidth, shadowWidth * 0., d1);
+        smoothstep(shadowWidth, shadowWidth * (1. - shadowSoftness) * 0.999, d1);
     if (d1 == min(shadowWidth, spread)) {
         shadowAlpha = 0.;
     }
     if (d1 == 0.) {
         shadowAlpha = isSigned ? 0. : 1.;
+    }
+    if (shadowWidth == 0.) {
+        shadowAlpha = 0.;
     }
 
     vec4 cShadow = shadowColor;
@@ -80,10 +85,12 @@ void main() {
 
     // Outline
     float d2 = readSDF(uv); // use linear value
-    vec4 cOutline = smoothstep(strokeWidth, strokeWidth * 0.3, d2) * strokeColor;
-    // if (d2 == 0.) {
-    //     cOutline *= 0.;
-    // }
+    float outlineAlpha = smoothstep(outlineWidth, outlineWidth * (1. - outlineSoftness) * 0.999, d2);
+    if (outlineWidth == 0.) {
+        outlineAlpha *= 0.;
+    }
+    vec4 cOutline = outlineColor;
+    cOutline.a *= outlineAlpha;
     color = blend(cOutline, color);
 
     // Original image
