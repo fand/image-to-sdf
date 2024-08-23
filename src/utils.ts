@@ -44,15 +44,9 @@ export async function createDrawCall(
   app: App,
   fragmentShader: string,
   vertexArray: VertexArray,
-  width: number,
-  height: number,
 ): Promise<DrawCall> {
   const [program] = await app.createPrograms([vertexShader, fragmentShader]);
-  const drawCall = app
-    .createDrawCall(program, vertexArray)
-    .uniform("resolution", [width, height] as any);
-
-  return drawCall;
+  return app.createDrawCall(program, vertexArray);
 }
 
 export function createPlaneGeometry(app: App): VertexArray {

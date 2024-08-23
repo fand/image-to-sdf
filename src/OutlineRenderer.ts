@@ -1,10 +1,10 @@
-import { PicoGL } from "picogl";
+import { App, DrawCall, PicoGL, UniformBuffer, VertexArray } from "picogl";
 import { createDrawCall, createPlaneGeometry } from "./utils";
-import { GetSDFOptions, validateOptions } from "./SDFGenerator";
+import { SDFOpts, validateOpts } from "./SDFGenerator";
 
 import outlineFs from "./OutlineRenderer.frag";
 
-export type DrawOutlinesOptions = {
+export type OutlineOpts = {
   imageAlpha: number;
   outlineWidth: number;
   outlineSoftness: number;
@@ -15,9 +15,7 @@ export type DrawOutlinesOptions = {
   shadowColor: [number, number, number, number];
 };
 
-function validateOutlineOptions(
-  opts: Partial<DrawOutlinesOptions>,
-): DrawOutlinesOptions {
+function validateOutlineOpts(opts: Partial<OutlineOpts>): OutlineOpts {
   const imageAlpha = opts.imageAlpha ?? 1;
   const outlineWidth = opts.outlineWidth ?? 10;
   const outlineSoftness = opts.outlineSoftness ?? 0.5;
@@ -39,117 +37,114 @@ function validateOutlineOptions(
   };
 }
 
-type OutlineRenderer = {
-  canvas: HTMLCanvasElement;
-  clear: () => void;
-  redraw: (opts: Partial<GetSDFOptions & DrawOutlinesOptions>) => void;
-};
+export class OutlineRenderer {
+  readonly canvas: HTMLCanvasElement;
+  #app: App;
+  #plane: VertexArray;
+  #drawCall: DrawCall | undefined;
+  #uniformBuffer: UniformBuffer | undefined;
 
-export async function drawOutlines(
-  image: HTMLImageElement,
-  sdf: Float32Array,
-  sdfOpts: Partial<GetSDFOptions> = {},
-  outlineOpts_: Partial<DrawOutlinesOptions> = {},
-): Promise<OutlineRenderer> {
-  const { spread, padding, pixelRatio, width, height, signed } =
-    validateOptions(sdfOpts, image.width, image.height);
-  const outlineOpts = validateOutlineOptions(outlineOpts_);
-
-  // Setup Canvas
-  const canvas = document.createElement("canvas");
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
-  // document.body.appendChild(canvas);
-
-  // Setup App
-  const app = PicoGL.createApp(canvas).clearColor(0.0, 0.0, 0.0, 1.0);
-
-  // Textures
-  const texSrc = app.createTexture2D(image, {
-    flipY: true,
-    wrapS: PicoGL.CLAMP_TO_EDGE,
-    wrapT: PicoGL.CLAMP_TO_EDGE,
-  });
-
-  const sdfW = (width + padding * 2) * pixelRatio;
-  const sdfH = (height + padding * 2) * pixelRatio;
-  const texSdf = app.createTexture2D(sdf, sdfW, sdfH, {
-    // flipY: true,
-    wrapS: PicoGL.CLAMP_TO_EDGE,
-    wrapT: PicoGL.CLAMP_TO_EDGE,
-    internalFormat: PicoGL.RGBA32F,
-  });
-
-  // UniformBuffer
-  const outlineUniformBuffer = app.createUniformBuffer([
-    PicoGL.FLOAT,
-    PicoGL.FLOAT,
-    PicoGL.FLOAT,
-    PicoGL.FLOAT_VEC4,
-    PicoGL.FLOAT_VEC2,
-    PicoGL.FLOAT,
-    PicoGL.FLOAT,
-    PicoGL.FLOAT_VEC4,
-  ]);
-  outlineUniformBuffer
-    .set(0, outlineOpts.imageAlpha as any)
-    .set(1, outlineOpts.outlineWidth as any)
-    .set(2, outlineOpts.outlineSoftness as any)
-    .set(3, outlineOpts.outlineColor as any)
-    .set(4, outlineOpts.shadowOffset as any)
-    .set(5, outlineOpts.shadowWidth as any)
-    .set(6, outlineOpts.shadowSoftness as any)
-    .set(7, outlineOpts.shadowColor as any)
-    .update();
-
-  // Setup draw call
-  const planeArray = createPlaneGeometry(app);
-  const drawCall = await createDrawCall(
-    app,
-    outlineFs,
-    planeArray,
-    width,
-    height,
-  );
-
-  drawCall
-    .uniformBlock("OutlineOpts", outlineUniformBuffer)
-    .uniform("resolution", [width, height] as any)
-    .uniform("padding", padding)
-    .uniform("spread", spread)
-    .uniform("isSigned", signed)
-    .texture("src", texSrc)
-    .texture("sdf", texSdf);
-
-  function draw() {
-    app.clear();
-    drawCall.draw();
-    // requestAnimationFrame(draw);
+  constructor() {
+    this.canvas = document.createElement("canvas");
+    this.#app = PicoGL.createApp(this.canvas).clearColor(0.0, 0.0, 0.0, 1.0);
+    this.#plane = createPlaneGeometry(this.#app);
   }
-  draw();
 
-  return {
-    canvas,
-    clear: () => {
-      canvas.remove();
-      app.loseContext();
-    },
-    redraw: (newOpts) => {
-      outlineUniformBuffer
-        .set(0, newOpts.imageAlpha as any)
-        .set(1, newOpts.outlineWidth as any)
-        .set(2, newOpts.outlineSoftness as any)
-        .set(3, newOpts.outlineColor as any)
-        .set(4, newOpts.shadowOffset as any)
-        .set(5, newOpts.shadowWidth as any)
-        .set(6, newOpts.shadowSoftness as any)
-        .set(7, newOpts.shadowColor as any)
-        .update();
+  async render(
+    image: HTMLImageElement,
+    sdf: Float32Array,
+    sdfOpts_: Partial<SDFOpts> = {},
+    outlineOpts_: Partial<OutlineOpts> = {},
+  ) {
+    const sdfOpts = validateOpts(sdfOpts_, image.width, image.height);
+    const outlineOpts = validateOutlineOpts(outlineOpts_);
 
-      app.clear();
-      drawCall.draw();
-    },
-  };
+    // Resize canvas
+    this.canvas.width = sdfOpts.width * sdfOpts.pixelRatio;
+    this.canvas.height = sdfOpts.height * sdfOpts.pixelRatio;
+    this.canvas.style.width = `${sdfOpts.width}px`;
+    this.canvas.style.height = `${sdfOpts.height}px`;
+    this.#app.resize(this.canvas.width, this.canvas.height);
+
+    const uniformBuffer = this.#createUniformBuffer(outlineOpts);
+    const drawCall = await this.#createDrawCall(sdfOpts, uniformBuffer);
+
+    // Textures
+    const texSrc = this.#app.createTexture2D(image, {
+      flipY: true,
+      wrapS: PicoGL.CLAMP_TO_EDGE,
+      wrapT: PicoGL.CLAMP_TO_EDGE,
+    });
+
+    const sdfW = (sdfOpts.width + sdfOpts.padding * 2) * sdfOpts.pixelRatio;
+    const sdfH = (sdfOpts.height + sdfOpts.padding * 2) * sdfOpts.pixelRatio;
+    const texSdf = this.#app.createTexture2D(sdf, sdfW, sdfH, {
+      // flipY: true,
+      wrapS: PicoGL.CLAMP_TO_EDGE,
+      wrapT: PicoGL.CLAMP_TO_EDGE,
+      internalFormat: PicoGL.RGBA32F,
+    });
+
+    drawCall.texture("src", texSrc).texture("sdf", texSdf);
+
+    // Draw
+    this.#app.clear();
+    drawCall.draw();
+
+    texSrc.delete();
+    texSdf.delete();
+  }
+
+  clear() {
+    this.canvas.remove();
+    this.#app.loseContext();
+  }
+
+  #createUniformBuffer(outlineOpts: OutlineOpts): UniformBuffer {
+    const uniformBuffer =
+      this.#uniformBuffer ??
+      this.#app.createUniformBuffer([
+        PicoGL.FLOAT,
+        PicoGL.FLOAT,
+        PicoGL.FLOAT,
+        PicoGL.FLOAT_VEC4,
+        PicoGL.FLOAT_VEC2,
+        PicoGL.FLOAT,
+        PicoGL.FLOAT,
+        PicoGL.FLOAT_VEC4,
+      ]);
+
+    uniformBuffer
+      .set(0, outlineOpts.imageAlpha as any)
+      .set(1, outlineOpts.outlineWidth as any)
+      .set(2, outlineOpts.outlineSoftness as any)
+      .set(3, outlineOpts.outlineColor as any)
+      .set(4, outlineOpts.shadowOffset as any)
+      .set(5, outlineOpts.shadowWidth as any)
+      .set(6, outlineOpts.shadowSoftness as any)
+      .set(7, outlineOpts.shadowColor as any)
+      .update();
+
+    this.#uniformBuffer = uniformBuffer;
+    return uniformBuffer;
+  }
+
+  async #createDrawCall(
+    opts: SDFOpts,
+    uniformBuffer: UniformBuffer,
+  ): Promise<DrawCall> {
+    const drawCall =
+      this.#drawCall ??
+      (await createDrawCall(this.#app, outlineFs, this.#plane));
+
+    drawCall
+      .uniformBlock("OutlineOpts", uniformBuffer)
+      .uniform("resolution", [opts.width, opts.height] as any)
+      .uniform("padding", opts.padding)
+      .uniform("spread", opts.spread)
+      .uniform("isSigned", opts.signed);
+
+    this.#drawCall = drawCall;
+    return drawCall;
+  }
 }
