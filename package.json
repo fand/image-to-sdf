@@ -19,6 +19,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build .",
+    "build:web": "vite -c vite.config.web.js build .",
     "test": "echo 'no test'"
   },
   "dependencies": {
